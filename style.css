@@ -1,0 +1,90 @@
+body {
+    background: #161a23;
+    color: #f0f0f0;
+    font-family: 'Cairo', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+.container {
+    max-width: 400px;
+    margin: 50px auto;
+    background: #262c3a;
+    padding: 30px 20px;
+    border-radius: 15px;
+    box-shadow: 0 0 20px #00000030;
+    text-align: center;
+}
+h1, h2, h3 {
+    color: #ffd700;
+}
+label {
+    display: block;
+    margin: 10px 0 5px;
+    text-align: right;
+}
+input, select {
+    width: 95%;
+    padding: 8px;
+    margin-bottom: 12px;
+    border: none;
+    border-radius: 7px;
+    background: #1d2230;
+    color: #fff;
+    font-size: 16px;
+}
+.btn {
+    background: #ffd700;
+    color: #262c3a;
+    border: none;
+    border-radius: 7px;
+    padding: 10px 22px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+    margin: 5px 0;
+    transition: background 0.3s;
+}
+.btn:hover {
+    background: #ffcf40;
+}
+hr {
+    margin: 25px 0;
+    border: 1px solid #23263a;
+}
+#lang-switch {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+}
+#lang-switch button {
+    margin: 0 3px;
+    padding: 5px 12px;
+    font-size: 15px;
+    border-radius: 5px;
+    border: none;
+    background: #23263a;
+    color: #ffd700;
+    cursor: pointer;
+}
+#lang-switch button.active, #lang-switch button:hover {
+    background: #ffd700;
+    color: #23263a;
+}
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+.table th, .table td {
+    border: 1px solid #2a2e3f;
+    padding: 8px;
+    color: #fff;
+    background: #23263a;
+}
+.table th {
+    background: #ffd700;
+    color: #23263a;
+}
+.status-pending { color: #ffa500; }
+.status-approved { color: #20c997; }
+.status-rejected { color: #dc3545; }

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>منصة تعدين متعددة العملات</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="lang-switch">
+        <button id="ar-btn">العربية</button>
+        <button id="en-btn">English</button>
+    </div>
+    <div class="container">
+        <h1 id="main-title">منصة تعدين متعددة العملات</h1>
+        <p id="welcome-text">مرحباً بك في منصة التعدين الوهمية!</p>
+        <a href="login.html" class="btn" id="login-btn">تسجيل الدخول / مستخدم جديد</a>
+    </div>
+    <script src="app.js"></script>
+    <script>
+        let lang = localStorage.getItem('lang') || 'ar';
+        function setLang(l) {
+            lang = l;
+            localStorage.setItem('lang', l);
+            document.documentElement.lang = l;
+            document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+            document.getElementById('main-title').textContent = l === 'ar' ? 'منصة تعدين متعددة العملات' : 'Multi-Currency Mining Platform';
+            document.getElementById('welcome-text').textContent = l === 'ar' ? 'مرحباً بك في منصة التعدين الوهمية!' : 'Welcome to the Fake Mining Platform!';
+            document.getElementById('login-btn').textContent = l === 'ar' ? 'تسجيل الدخول / مستخدم جديد' : 'Login / New User';
+        }
+        setLang(lang);
+        document.getElementById('ar-btn').onclick = () => setLang('ar');
+        document.getElementById('en-btn').onclick = () => setLang('en');
+    </script>
+</body>
+</html>

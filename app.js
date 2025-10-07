@@ -1,0 +1,441 @@
+// إعدادات افتراضية للعملات والحدود
+const defaultCurrencies = [
+    { symbol: 'BTC', name: { ar: 'بيتكوين', en: 'Bitcoin' }, minDeposit: 0.001, maxDeposit: 2, minWithdraw: 0.001, maxWithdraw: 1 },
+    { symbol: 'ETH', name: { ar: 'إيثيريوم', en: 'Ethereum' }, minDeposit: 0.01, maxDeposit: 10, minWithdraw: 0.01, maxWithdraw: 5 },
+    { symbol: 'LTC', name: { ar: 'لايتكوين', en: 'Litecoin' }, minDeposit: 0.1, maxDeposit: 50, minWithdraw: 0.1, maxWithdraw: 25 },
+];
+
+const ADMIN_USER = {
+    username: "Z_Class",
+    password: "Zhz242002Zhz",
+    isAdmin: true
+};
+
+// استرجاع اللغة
+function getLang() {
+    return localStorage.getItem('lang') || 'ar';
+}
+
+// إدارة المستخدمين
+function getUsers() {
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    // ضمان وجود المدير دائماً
+    if (!users.find(u => u.username === ADMIN_USER.username)) users.push(ADMIN_USER);
+    return users;
+}
+function saveUsers(users) {
+    localStorage.setItem('users', JSON.stringify(users));
+}
+function getUser(username) {
+    return getUsers().find(u => u.username === username);
+}
+
+// إدارة العملات
+function getCurrencies() {
+    let curr = JSON.parse(localStorage.getItem('currencies') || 'null');
+    if (!curr) {
+        curr = defaultCurrencies;
+        localStorage.setItem('currencies', JSON.stringify(curr));
+    }
+    return curr;
+}
+function saveCurrencies(curr) {
+    localStorage.setItem('currencies', JSON.stringify(curr));
+}
+
+// إدارة الحساب الحالي
+function setCurrentUser(user) {
+    localStorage.setItem('currentUser', JSON.stringify(user));
+}
+function getCurrentUser() {
+    return JSON.parse(localStorage.getItem('currentUser') || 'null');
+}
+function logout() {
+    localStorage.removeItem('currentUser');
+    window.location.href = 'login.html';
+}
+
+// إدارة أرصدة المستخدمين
+function getBalances(username) {
+    const balances = JSON.parse(localStorage.getItem(`balances_${username}`) || '{}');
+    // ضمان وجود كل العملات
+    getCurrencies().forEach(c => {
+        if (!(c.symbol in balances)) balances[c.symbol] = 0;
+    });
+    return balances;
+}
+function saveBalances(username, balances) {
+    localStorage.setItem(`balances_${username}`, JSON.stringify(balances));
+}
+
+// إدارة العمليات (السحب/الإيداع)
+function getOperations(username) {
+    return JSON.parse(localStorage.getItem(`ops_${username}`) || '[]');
+}
+function saveOperations(username, ops) {
+    localStorage.setItem(`ops_${username}`, JSON.stringify(ops));
+}
+
+// إدارة طلبات السحب/الإيداع للموافقة من المدير
+function getPendingRequests() {
+    return JSON.parse(localStorage.getItem('pendingRequests') || '[]');
+}
+function savePendingRequests(reqs) {
+    localStorage.setItem('pendingRequests', JSON.stringify(reqs));
+}
+
+// تعريب أو ترجمة النصوص
+function t(ar, en) {
+    return getLang() === 'ar' ? ar : en;
+}
+
+// --------- تسجيل الدخول وتسجيل جديد ---------
+if (window.location.pathname.endsWith('login.html')) {
+    document.getElementById('login-form').onsubmit = function(e) {
+        e.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const user = getUser(username);
+        if (user && user.password === password) {
+            setCurrentUser(user);
+            window.location.href = 'dashboard.html';
+        } else {
+            alert(t('اسم المستخدم أو كلمة المرور خاطئة!', 'Wrong username or password!'));
+        }
+    };
+    document.getElementById('register-form').onsubmit = function(e) {
+        e.preventDefault();
+        const username = document.getElementById('new-username').value.trim();
+        const password = document.getElementById('new-password').value;
+        if (!username || !password) {
+            alert(t('يرجى إدخال جميع البيانات', 'Please enter all fields'));
+            return;
+        }
+        if (getUser(username)) {
+            alert(t('اسم المستخدم موجود بالفعل', 'Username already exists'));
+            return;
+        }
+        const users = getUsers();
+        users.push({ username, password, isAdmin: false });
+        saveUsers(users);
+        alert(t('تم التسجيل بنجاح! يمكنك تسجيل الدخول الآن.', 'Registered successfully! You can now login.'));
+    };
+    // تعريب الصفحة حسب اللغة
+    function translateLogin() {
+        const l = getLang();
+        document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = l;
+        document.getElementById('login-title').textContent = t('تسجيل الدخول', 'Login');
+        document.getElementById('user-label').textContent = t('اسم المستخدم:', 'Username:');
+        document.getElementById('pass-label').textContent = t('كلمة المرور:', 'Password:');
+        document.getElementById('login-btn').textContent = t('دخول', 'Login');
+        document.getElementById('register-title').textContent = t('مستخدم جديد؟', 'New User?');
+        document.getElementById('new-user-label').textContent = t('اسم المستخدم:', 'Username:');
+        document.getElementById('new-pass-label').textContent = t('كلمة المرور:', 'Password:');
+        document.getElementById('register-btn').textContent = t('تسجيل جديد', 'Register');
+    }
+    translateLogin();
+}
+
+// --------- لوحة التحكم ---------
+if (window.location.pathname.endsWith('dashboard.html')) {
+    const container = document.getElementById('dashboard-container');
+    const user = getCurrentUser();
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+    const balances = getBalances(user.username);
+    function renderUserDashboard() {
+        container.innerHTML = `
+            <h2>${t('لوحة تحكم المستخدم', 'User Dashboard')}</h2>
+            <p>${t('مرحباً', 'Welcome')}, <b>${user.username}</b>!</p>
+            <button class="btn" onclick="logout()">${t('تسجيل الخروج', 'Logout')}</button>
+            <hr>
+            <h3>${t('أرصدة التعدين:', 'Mining Balances:')}</h3>
+            <div>
+                ${getCurrencies().map(c => `<div><b>${c.name[getLang()]} (${c.symbol})</b>: ${balances[c.symbol].toFixed(5)}</div>`).join('')}
+            </div>
+            <hr>
+            <h3>${t('طلب إيداع:', 'Deposit Request')}</h3>
+            <form id="deposit-form">
+                <select id="deposit-currency">
+                    ${getCurrencies().map(c => `<option value="${c.symbol}">${c.name[getLang()]} (${c.symbol})</option>`).join('')}
+                </select>
+                <input type="number" id="deposit-amount" min="0" step="any" placeholder="${t('المبلغ', 'Amount')}" required>
+                <button class="btn" type="submit">${t('طلب إيداع', 'Request Deposit')}</button>
+            </form>
+            <hr>
+            <h3>${t('طلب سحب:', 'Withdraw Request')}</h3>
+            <form id="withdraw-form">
+                <select id="withdraw-currency">
+                    ${getCurrencies().map(c => `<option value="${c.symbol}">${c.name[getLang()]} (${c.symbol})</option>`).join('')}
+                </select>
+                <input type="number" id="withdraw-amount" min="0" step="any" placeholder="${t('المبلغ', 'Amount')}" required>
+                <button class="btn" type="submit">${t('طلب سحب', 'Request Withdraw')}</button>
+            </form>
+            <hr>
+            <h3>${t('سجل العمليات:', 'Operations History')}</h3>
+            <table class="table">
+                <tr>
+                    <th>${t('العملية', 'Type')}</th>
+                    <th>${t('العملة', 'Currency')}</th>
+                    <th>${t('المبلغ', 'Amount')}</th>
+                    <th>${t('الحالة', 'Status')}</th>
+                    <th>${t('تاريخ الطلب', 'Date')}</th>
+                </tr>
+                ${getOperations(user.username).map(op => `
+                    <tr>
+                        <td>${t(op.type === "deposit" ? "إيداع" : "سحب", op.type === "deposit" ? "Deposit" : "Withdraw")}</td>
+                        <td>${op.currency}</td>
+                        <td>${op.amount}</td>
+                        <td class="status-${op.status}">${t(
+                            op.status === "pending" ? "قيد الانتظار" : op.status === "approved" ? "مقبول" : "مرفوض",
+                            op.status === "pending" ? "Pending" : op.status === "approved" ? "Approved" : "Rejected"
+                        )}</td>
+                        <td>${op.date}</td>
+                    </tr>
+                `).join('')}
+            </table>
+        `;
+        // أحداث الإيداع
+        document.getElementById('deposit-form').onsubmit = function(e) {
+            e.preventDefault();
+            const currency = document.getElementById('deposit-currency').value;
+            const amount = parseFloat(document.getElementById('deposit-amount').value);
+            const curr = getCurrencies().find(c => c.symbol === currency);
+            if (amount < curr.minDeposit || amount > curr.maxDeposit) {
+                alert(t(`الحد الأدنى للإيداع: ${curr.minDeposit} والحد الأقصى: ${curr.maxDeposit}`,
+                        `Min deposit: ${curr.minDeposit}, Max: ${curr.maxDeposit}`));
+                return;
+            }
+            // طلب إيداع جديد
+            const op = { type: "deposit", currency, amount, status: "pending", user: user.username, date: new Date().toLocaleString(), id: Date.now() };
+            const ops = getOperations(user.username); ops.push(op); saveOperations(user.username, ops);
+            // إضافة الطلب للمدير
+            const reqs = getPendingRequests(); reqs.push({ ...op }); savePendingRequests(reqs);
+            alert(t('تم إرسال طلب الإيداع للمدير!', 'Deposit request sent to admin!'));
+            renderUserDashboard();
+        };
+        // أحداث السحب
+        document.getElementById('withdraw-form').onsubmit = function(e) {
+            e.preventDefault();
+            const currency = document.getElementById('withdraw-currency').value;
+            const amount = parseFloat(document.getElementById('withdraw-amount').value);
+            const curr = getCurrencies().find(c => c.symbol === currency);
+            if (amount < curr.minWithdraw || amount > curr.maxWithdraw) {
+                alert(t(`الحد الأدنى للسحب: ${curr.minWithdraw} والحد الأقصى: ${curr.maxWithdraw}`,
+                        `Min withdraw: ${curr.minWithdraw}, Max: ${curr.maxWithdraw}`));
+                return;
+            }
+            if (balances[currency] < amount) {
+                alert(t('الرصيد غير كافٍ!', 'Insufficient balance!'));
+                return;
+            }
+            // طلب سحب جديد
+            const op = { type: "withdraw", currency, amount, status: "pending", user: user.username, date: new Date().toLocaleString(), id: Date.now() };
+            const ops = getOperations(user.username); ops.push(op); saveOperations(user.username, ops);
+            // إضافة الطلب للمدير
+            const reqs = getPendingRequests(); reqs.push({ ...op }); savePendingRequests(reqs);
+            alert(t('تم إرسال طلب السحب للمدير!', 'Withdraw request sent to admin!'));
+            renderUserDashboard();
+        };
+    }
+
+    // لوحة المدير
+    function renderAdminDashboard() {
+        container.innerHTML = `
+            <h2>${t('لوحة تحكم المدير', 'Admin Dashboard')}</h2>
+            <p>${t('مرحباً', 'Welcome')}, <b>${user.username}</b>!</p>
+            <button class="btn" onclick="logout()">${t('تسجيل الخروج', 'Logout')}</button>
+            <hr>
+            <h3>${t('إدارة العملات:', 'Manage Currencies:')}</h3>
+            <table class="table">
+                <tr>
+                    <th>${t('العملة', 'Currency')}</th>
+                    <th>${t('اسم العملة', 'Name')}</th>
+                    <th>${t('حد أدنى إيداع', 'Min Deposit')}</th>
+                    <th>${t('حد أعلى إيداع', 'Max Deposit')}</th>
+                    <th>${t('حد أدنى سحب', 'Min Withdraw')}</th>
+                    <th>${t('حد أعلى سحب', 'Max Withdraw')}</th>
+                    <th>${t('إجراءات', 'Actions')}</th>
+                </tr>
+                ${getCurrencies().map((c, i) => `
+                    <tr>
+                        <td>${c.symbol}</td>
+                        <td>${c.name[getLang()]}</td>
+                        <td><input type="number" value="${c.minDeposit}" min="0.0001" style="width:60px" onchange="updateCurrency(${i},'minDeposit',this.value)"></td>
+                        <td><input type="number" value="${c.maxDeposit}" min="0.0001" style="width:60px" onchange="updateCurrency(${i},'maxDeposit',this.value)"></td>
+                        <td><input type="number" value="${c.minWithdraw}" min="0.0001" style="width:60px" onchange="updateCurrency(${i},'minWithdraw',this.value)"></td>
+                        <td><input type="number" value="${c.maxWithdraw}" min="0.0001" style="width:60px" onchange="updateCurrency(${i},'maxWithdraw',this.value)"></td>
+                        <td><button class="btn" onclick="deleteCurrency(${i})">${t('حذف', 'Delete')}</button></td>
+                    </tr>
+                `).join('')}
+            </table>
+            <form id="add-currency-form">
+                <input type="text" id="new-symbol" placeholder="${t('رمز العملة', 'Symbol')}" required style="width:80px">
+                <input type="text" id="new-name-ar" placeholder="${t('اسم بالعربية', 'Arabic Name')}" required style="width:90px">
+                <input type="text" id="new-name-en" placeholder="${t('اسم بالإنجليزية', 'English Name')}" required style="width:120px">
+                <input type="number" id="new-min-dep" placeholder="${t('حد أدنى إيداع', 'Min Deposit')}" required style="width:70px">
+                <input type="number" id="new-max-dep" placeholder="${t('حد أعلى إيداع', 'Max Deposit')}" required style="width:70px">
+                <input type="number" id="new-min-wth" placeholder="${t('حد أدنى سحب', 'Min Withdraw')}" required style="width:70px">
+                <input type="number" id="new-max-wth" placeholder="${t('حد أعلى سحب', 'Max Withdraw')}" required style="width:70px">
+                <button class="btn" type="submit">${t('إضافة عملة', 'Add Currency')}</button>
+            </form>
+            <hr>
+            <h3>${t('طلبات السحب والإيداع:', 'Withdraw/Deposit Requests')}</h3>
+            <table class="table">
+                <tr>
+                    <th>${t('المستخدم', 'User')}</th>
+                    <th>${t('العملية', 'Type')}</th>
+                    <th>${t('العملة', 'Currency')}</th>
+                    <th>${t('المبلغ', 'Amount')}</th>
+                    <th>${t('الحالة', 'Status')}</th>
+                    <th>${t('تاريخ الطلب', 'Date')}</th>
+                    <th>${t('إجراءات', 'Actions')}</th>
+                </tr>
+                ${getPendingRequests().map((op, i) => `
+                    <tr>
+                        <td>${op.user}</td>
+                        <td>${t(op.type === "deposit" ? "إيداع" : "سحب", op.type === "deposit" ? "Deposit" : "Withdraw")}</td>
+                        <td>${op.currency}</td>
+                        <td>${op.amount}</td>
+                        <td class="status-${op.status}">${t(
+                            op.status === "pending" ? "قيد الانتظار" : op.status === "approved" ? "مقبول" : "مرفوض",
+                            op.status === "pending" ? "Pending" : op.status === "approved" ? "Approved" : "Rejected"
+                        )}</td>
+                        <td>${op.date}</td>
+                        <td>
+                            ${op.status === "pending" ? `
+                                <button class="btn" onclick="approveRequest(${i})">${t('موافقة', 'Approve')}</button>
+                                <button class="btn" onclick="rejectRequest(${i})">${t('رفض', 'Reject')}</button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `).join('')}
+            </table>
+            <hr>
+            <h3>${t('إدارة المستخدمين:', 'Manage Users')}</h3>
+            <table class="table">
+                <tr>
+                    <th>${t('اسم المستخدم', 'Username')}</th>
+                    <th>${t('مدير؟', 'Admin?')}</th>
+                    <th>${t('إجراءات', 'Actions')}</th>
+                </tr>
+                ${getUsers().map((u, i) => `
+                    <tr>
+                        <td>${u.username}</td>
+                        <td>${u.isAdmin ? t('نعم', 'Yes') : t('لا', 'No')}</td>
+                        <td>
+                            ${!u.isAdmin ? `<button class="btn" onclick="deleteUser(${i})">${t('حذف', 'Delete')}</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('')}
+            </table>
+        `;
+
+        // إضافة عملة
+        document.getElementById('add-currency-form').onsubmit = function(e) {
+            e.preventDefault();
+            const symbol = document.getElementById('new-symbol').value.trim();
+            const nameAr = document.getElementById('new-name-ar').value.trim();
+            const nameEn = document.getElementById('new-name-en').value.trim();
+            const minDep = parseFloat(document.getElementById('new-min-dep').value);
+            const maxDep = parseFloat(document.getElementById('new-max-dep').value);
+            const minWth = parseFloat(document.getElementById('new-min-wth').value);
+            const maxWth = parseFloat(document.getElementById('new-max-wth').value);
+            let curr = getCurrencies();
+            if (curr.find(c => c.symbol === symbol)) {
+                alert(t('رمز العملة موجود بالفعل', 'Currency symbol already exists'));
+                return;
+            }
+            curr.push({ symbol, name: { ar: nameAr, en: nameEn }, minDeposit: minDep, maxDeposit: maxDep, minWithdraw: minWth, maxWithdraw: maxWth });
+            saveCurrencies(curr);
+            renderAdminDashboard();
+        };
+    }
+
+    // تحديث حدود العملة من لوحة المدير
+    window.updateCurrency = function(i, field, value) {
+        let curr = getCurrencies();
+        curr[i][field] = parseFloat(value);
+        saveCurrencies(curr);
+    };
+
+    // حذف عملة من لوحة المدير
+    window.deleteCurrency = function(i) {
+        let curr = getCurrencies();
+        curr.splice(i, 1);
+        saveCurrencies(curr);
+        renderAdminDashboard();
+    };
+
+    // حذف مستخدم من لوحة المدير
+    window.deleteUser = function(i) {
+        let users = getUsers();
+        users.splice(i, 1);
+        saveUsers(users);
+        renderAdminDashboard();
+    };
+
+    // الموافقة على طلب
+    window.approveRequest = function(i) {
+        let reqs = getPendingRequests();
+        let op = reqs[i];
+        op.status = "approved";
+        // تحديث الرصيد إذا كان إيداع أو سحب
+        let balances = getBalances(op.user);
+        if (op.type === "deposit") {
+            balances[op.currency] += op.amount;
+        } else if (op.type === "withdraw") {
+            balances[op.currency] -= op.amount;
+        }
+        saveBalances(op.user, balances);
+        // تحديث سجل العمليات
+        let ops = getOperations(op.user);
+        let idx = ops.findIndex(o => o.id === op.id);
+        if (idx !== -1) {
+            ops[idx].status = "approved";
+            saveOperations(op.user, ops);
+        }
+        savePendingRequests(reqs);
+        renderAdminDashboard();
+    };
+
+    // رفض طلب
+    window.rejectRequest = function(i) {
+        let reqs = getPendingRequests();
+        let op = reqs[i];
+        op.status = "rejected";
+        // تحديث سجل العمليات
+        let ops = getOperations(op.user);
+        let idx = ops.findIndex(o => o.id === op.id);
+        if (idx !== -1) {
+            ops[idx].status = "rejected";
+            saveOperations(op.user, ops);
+        }
+        savePendingRequests(reqs);
+        renderAdminDashboard();
+    };
+
+    // تعريب الصفحة حسب اللغة
+    function translateDashboard() {
+        const l = getLang();
+        document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = l;
+        // إعادة عرض لوحة التحكم بعد تغيير اللغة
+        if (user.isAdmin) renderAdminDashboard();
+        else renderUserDashboard();
+    }
+
+    // تفعيل التعريب عند تغيير اللغة
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'lang') translateDashboard();
+    });
+
+    // أول عرض للوحة التحكم
+    translateDashboard();
+}
+
+// -------- أدوات عامة --------
+window.logout = logout;
